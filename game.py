@@ -234,7 +234,7 @@ class GameState():
         def make_move(i):
             try:
                 print('==PLAYER ' + str(i) + '==')
-                move_str = raw_input('Move? [0/1/2/3] [data]: ').split(' ')
+                move_str = raw_input('Move? [t3/t2/r/b] [data]: ').split(' ')
                 action, data = move_str[0], [int(x) for x in move_str[1:]]
                 self.move(i, action, data)
                 self.print_state()
