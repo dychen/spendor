@@ -6,6 +6,7 @@ class IllegalMove(Exception):
 
 
 class GameState():
+    __WIN_POINTS = 15
     __TIERS = [1, 2, 3]
     __TIER_SIZE = 4
     __GEMS = ['w', 'u', 'g', 'r', 'b']
@@ -70,7 +71,8 @@ class GameState():
         self.players = self.__initialize_players(num_players)
         self.meta = {
             'num_players': num_players,
-            'turn': 1
+            'turn': 1,
+            'is_last_turn': False
         }
 
     def get_points(self, player):
@@ -163,19 +165,29 @@ class GameState():
         # Take gold
         self.players[player]['gold'] += 1
 
+    def can_buy(self, card_list, index, player):
+        self.__check_card_exists(card_list, index)
+        target = card_list[index]
+        self.__check_player_can_buy(player, target[:5])
+        return target
+
     def move_buy(self, player, data):
-        def check(card_list, index):
-            self.__check_card_exists(card_list, index)
-            target = card_list[index]
-            self.__check_player_can_buy(player, target[:5])
-            return target
         def pay(card):
+            # Number of gems the player needs to spend without gold
             cost_arr = [max(x - y, 0) for x, y in zip(card[:5], self.get_card_gems(player))]
             new_pgems = [x - y for x, y in zip(self.players[player]['gems'], cost_arr)]
-            gold_cost = abs(sum([x for x in new_pgems if x < 0]))
-            new_pgems = [max(x, 0) for x in new_pgems]
-            self.players[player]['gems'] = new_pgems
+            gold_rebate = [abs(min(x, 0)) for x in new_pgems]
+            gold_cost = sum(gold_rebate)
+            # Number of gems the player needs to spend with gold
+            cost_arr2 = [x - y for x, y in zip(cost_arr, gold_rebate)]
+            new_pgems2 = [x - y for x, y in zip(self.players[player]['gems'], cost_arr2)]
+            assert(sum([x - y for x, y in zip(cost_arr, cost_arr2)]) == gold_cost)
+            # Update player state
+            self.players[player]['gems'] = new_pgems2
             self.players[player]['gold'] -= gold_cost
+            # Update board state
+            self.gems = [x + y for x, y in zip(self.gems, cost_arr2)]
+            self.gold += gold_cost
         def take(card_list, index):
             card = card_list.pop(index)
             self.players[player]['cards'].append(card)
@@ -184,12 +196,12 @@ class GameState():
         tier, index, from_reserve = data
         if from_reserve:
             card_list = self.players[player]['reserved']
-            card = check(card_list, index)
+            card = self.can_buy(card_list, index, player)
             pay(card)
             take(card_list, index)
         else:
             card_list = self.board[tier]
-            card = check(card_list, index)
+            card = self.can_buy(card_list, index, player)
             pay(card)
             take(card_list, index)
             card_list.append(self.__draw(tier)) # Replace card
@@ -210,6 +222,18 @@ class GameState():
         else:
             raise IllegalMove('Invalid action - must be one of [t3/t2/r/b]')
 
+    def __print_player_state(self, i):
+        pstate = self.players[i]
+        print('=PLAYER {}='.format(i))
+        print('  POINTS: {}'.format(self.get_points(i)))
+        print('  NORM GEMS: {} GOLD: {}'.format(pstate['gems'], pstate['gold']))
+        print('  CARD GEMS: {}'.format(self.get_card_gems(i)))
+        print('  TOTL GEMS: {} GOLD: {}'.format(self.get_total_gems(i), pstate['gold']))
+        for card in pstate['cards']:
+            print('    CARD: {}'.format(card))
+        for card in pstate['reserved']:
+            print('    RESERVED: {}'.format(card))
+
     def print_state(self):
         print('=====NEW STATE=====')
         for tier, bstate in self.board.items():
@@ -218,23 +242,46 @@ class GameState():
                 print(card)
         print('=GEMS=')
         print(self.gems)
-        for i, pstate in self.players.items():
-            print('=PLAYER {}='.format(i))
-            print('  POINTS: {}'.format(self.get_points(i)))
-            print('  NORM GEMS: {} GOLD: {}'.format(pstate['gems'], pstate['gold']))
-            print('  CARD GEMS: {}'.format(self.get_card_gems(i)))
-            print('  TOTL GEMS: {} GOLD: {}'.format(self.get_total_gems(i), pstate['gold']))
-            for card in pstate['cards']:
-                print('    CARD: {}'.format(card))
-            for card in pstate['reserved']:
-                print('    RESERVED: {}'.format(card))
+        for i, _ in self.players.items():
+            self.__print_player_state(i)
         print('========END========')
+
+    def check_last_turn(self):
+        for i, pstate in self.players.items():
+            if self.get_points(i) >= self.__WIN_POINTS:
+                return True
+        return False
+
+    def print_results(self):
+        # Sort by: 1. most number of points 2. reverse player order 3. least number of cards
+        sorted_players = sorted([
+            (i, self.get_points(i), len(self.players[i]['cards']))
+            for i, pstate in self.players.items()
+        ], key=lambda x: (-x[1], -x[0], x[2]))
+        for i, t in enumerate(sorted_players):
+            pindex, _, _ = t
+            print('==RANK {}: PLAYER {}=='.format(i+1, pindex))
+            self.__print_player_state(i)
+        print('!!!WINNER: PLAYER {}!!!'.format(sorted_players[0][0]))
+
+    def print_possible_buys(self, player):
+        print('=POSSIBLE BUYS:=')
+        for card_list, name in ([(self.players[player]['reserved'], 'Reserved')]
+                                + [(self.board[tier], 'Tier {}'.format(tier))
+                                   for tier in self.__TIERS]):
+            for i in range(len(card_list)):
+                try:
+                    card = self.can_buy(card_list, i, player)
+                    print(name, i, card)
+                except IllegalMove:
+                    continue
 
     def run(self):
         def make_move(i):
             try:
                 print('==PLAYER ' + str(i) + '==')
-                move_str = raw_input('Move? [t3/t2/r/b] [data]: ').split(' ')
+                self.print_possible_buys(i)
+                move_str = raw_input('Move? [t3/t2/r/b] [data]: ').strip().split(' ')
                 action, data = move_str[0], [int(x) for x in move_str[1:]]
                 self.move(i, action, data)
                 self.print_state()
@@ -243,10 +290,14 @@ class GameState():
                 make_move(i)
 
         self.print_state()
-        while True:
+        while not self.meta['is_last_turn']:
             print('\n\n==TURN ' + str(self.meta['turn']) + '==')
             for i in range(self.meta['num_players']):
                 make_move(i)
+                if self.check_last_turn():
+                    print('=LAST TURN, PLAYER {} HAS {} POINTS='.format(i, self.get_points(i)))
+                    self.meta['is_last_turn'] = True
             self.meta['turn'] += 1
+        self.print_results()
 
 GameState().run()

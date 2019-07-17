@@ -6,23 +6,23 @@ https://en.wikipedia.org/wiki/Splendor_(game)
 ```
 $ python game.py
 
-[Long printout of game state]
+[Long printout of game state, see "Board state" section below]
 
->> Move? [0/1/2/3] [data]:
+>> Move? [t3/t2/r/b] [data]:
 # Possible moves:
 
 # Take three gems
 >> t3 [5-element array of the number of gems to take of each color in the order: W,U,G,R,B]
 # E.g.
->> t3 1 1 1 0 0 # Takes one white, one blue, and one green gem. Takes zero red or black gems.
->> t3 0 1 0 1 1 # Takes one blue, one red, and one black gem.
->> t3 1 0 0 0 1 # Takes one white and one black gem - do this if taking more puts you over the stack limit.
+>> t3 1 1 1 0 0 # Take one white, one blue, and one green gem. Takes zero red or black gems.
+>> t3 0 1 0 1 1 # Take one blue, one red, and one black gem.
+>> t3 1 0 0 0 1 # Take one white and one black gem - do this if taking more puts you over the stack limit.
 
 # Take two gems
 >> t2 [5-element array of the number of gems to take - should always have one 2 and four 0s]
 # E.g.
->> t2 0 0 2 0 0 # Takes two green gems.
->> t2 0 0 0 2 0 # Takes two red gems.
+>> t2 0 0 2 0 0 # Take two green gems.
+>> t2 0 0 0 2 0 # Take two red gems.
 # Remember that you cannot take two if the corresponding gem stack is below 4.
 # If you want to take only 1 gem, use t3 ("take 3") instead (e.g. t3 1 0 0 0 0).
 
