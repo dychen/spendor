@@ -11,7 +11,7 @@ $ python game.py
 
 [Long printout of game state, see "Board state" section below]
 
->> Move? [t3/t2/r/b] [data]:
+>> Move? [t3/t2/r/b/br] [data]:
 # Possible moves:
 
 # Take three gems
@@ -37,15 +37,18 @@ $ python game.py
 >> r 2 1 # Reserve the second card in Tier 2
 >> r 3 3 # Reserve the last card in Tier 3
 
-# Buy a card
->> b [tier - 1, 2, or 3] [index - 0, 1, 2, or 3] [buy from reserve - 1 if YES, 0 if NO]
+# Buy a card from the board
+>> b [tier - 1, 2, or 3] [index - 0, 1, 2, or 3]
 # Again, these are zero-indexed
 # E.g.
->> b 1 0 0 # Buy the first card in Tier 1
->> b 1 0 1 # Buy the first card in your reserve (the first 1 for tier is ignored)
->> b 3 2 0 # Buy the third card in Tier 3
->> b 0 1 1 # Buy the second card in your reserve (index - 1, buy from reserve - 1/YES)
->> b 0 1 0 # INVALID - can't buy from Tier 0 (tier - 0, index - 1, buy from reserve - 0/NO)
+>> b 1 0 # Buy the first card in Tier 1
+>> b 3 2 0 Buy the third card in Tier 3
+>> b 0 1 # INVALID - can't buy from Tier 0 (tier - 0, index - 1)
+
+# Buy a card from reserves
+>> br [index - 0, 1, 2, or 3]
+>> br 0 # Buy the first card in your reserve
+>> br 1 # Buy the second card in your reserve
 ```
 
 # Board state

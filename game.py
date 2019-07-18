@@ -141,10 +141,13 @@ class GameState():
         if not (len(self.players[player]['reserved']) < self.__P_RESERVE_LIMIT):
             raise IllegalMove('Player has already reserved the max amount of cards')
 
-    def __check_buy_valid(self, data):
-        if (len(data) != 3
-            or not data[0] in self.board and not data[2]): # Not buying from reserve
-            raise IllegalMove('Invalid buy input')
+    def __check_buy_from_board_valid(self, data):
+        if len(data) != 2 or not data[0] in self.board:
+            raise IllegalMove('Invalid buy from board input')
+
+    def __check_buy_from_reserve_valid(self, data):
+        if len(data) != 1:
+            raise IllegalMove('Invalid buy from reserve input')
 
     def __check_card_exists(self, card_list, index):
         try:
@@ -195,7 +198,7 @@ class GameState():
         self.__check_player_can_buy(player, target[:5])
         return target
 
-    def move_buy(self, player, data):
+    def move_buy(self, player, tier, index, from_reserve):
         def pay(card):
             # Number of gems the player needs to spend without gold
             cost_arr = [max(x - y, 0) for x, y in zip(card[:5], self.get_card_gems(player))]
@@ -226,8 +229,6 @@ class GameState():
             self.nobles = [noble for i, noble in enumerate(self.nobles)
                            if i not in to_remove_indices]
 
-        self.__check_buy_valid(data)
-        tier, index, from_reserve = data
         if from_reserve:
             card_list = self.players[player]['reserved']
             card = self.can_buy(card_list, index, player)
@@ -241,6 +242,16 @@ class GameState():
             self.__draw_and_replace(self.cards[tier], card_list)
         noble_visit()
 
+    def move_buy_from_board(self, player, data):
+        self.__check_buy_from_board_valid(data)
+        tier, index = data
+        self.move_buy(player, tier, index, False)
+
+    def move_buy_from_reserve(self, player, data):
+        self.__check_buy_from_reserve_valid(data)
+        index, = data # Deconstruct list of size 1
+        self.move_buy(player, None, index, True)
+
     def move(self, player, action, data):
         if action == 't3':
             self.move_take_3(player, data)
@@ -252,10 +263,13 @@ class GameState():
             self.move_reserve(player, data)
             print('>> Player {} reserved a card: {}'.format(player, data))
         elif action == 'b':
-            self.move_buy(player, data)
-            print('>> Player {} bought a card: {}'.format(player, data))
+            self.move_buy_from_board(player, data)
+            print('>> Player {} bought a card from the board: {}'.format(player, data))
+        elif action == 'br':
+            self.move_buy_from_reserve(player, data)
+            print('>> Player {} bought a card from the reserve: {}'.format(player, data))
         else:
-            raise IllegalMove('Invalid action - must be one of [t3/t2/r/b]')
+            raise IllegalMove('Invalid action - must be one of [t3/t2/r/b/br]')
 
     def __print_player_state(self, i):
         pstate = self.players[i]
@@ -321,8 +335,8 @@ class GameState():
             try:
                 print('==PLAYER ' + str(i) + '==')
                 self.print_possible_buys(i)
-                move_str = raw_input('Move? [t3/t2/r/b] [data]: ').strip().split(' ')
-                action, data = move_str[0], [int(x) for x in move_str[1:]]
+                move_arr = raw_input('Move? [t3/t2/r/b/br] [data]: ').strip().split(' ')
+                action, data = move_arr[0], [int(x) for x in move_arr[1:]]
                 self.move(i, action, data)
                 self.print_state()
             except IllegalMove as e:
