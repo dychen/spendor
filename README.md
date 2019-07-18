@@ -95,10 +95,13 @@ $ python game.py
 Read card state (7-element array) as follows:
 ```
 [White cost, Blue cost, Green cost, Red cost, Black cost, Gem bonus color (always +1), Points/prestige]
+```
 
 # Nobles
 Read noble state (6-element array) as follows:
+```
 [White cost, Blue cost, Green cost, Red cost, Black cost, Points/prestige]
+```
 
 # TODOs/Rules questions (unresolved)?
 * Can you reserve a card if the gold stack is depleted? Currently, it throws an error
