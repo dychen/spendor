@@ -14,29 +14,48 @@ class GameState():
     __T2_GEM_LIMIT = 4
     __GOLD_LIMIT = 5
     __P_RESERVE_LIMIT = 3
+    __NUM_NOBLES = 4
 
     def __load_cards(self):
         d = { t: [] for t in self.__TIERS }
         with open('gamedata.tsv') as f:
             for line in f:
-                t, w_c, u_c, g_c, r_c, b_c, v, p = line.split('\t')
+                t, w_c, u_c, g_c, r_c, b_c, v, p = line.strip().split('\t')
                 d[int(t)].append([int(w_c), int(u_c), int(g_c), int(r_c), int(b_c), v, int(p)])
         return d
 
-    def __shuffle(self):
-        for t, cards in self.cards.items():
+    def __load_nobles(self):
+        nobles = []
+        with open('nobledata.tsv') as f:
+            for line in f:
+                w_c, u_c, g_c, r_c, b_c, p = line.strip().split('\t')
+                nobles.append([int(w_c), int(u_c), int(g_c), int(r_c), int(b_c), int(p)])
+        return nobles
+
+    def __shuffle_cards(self):
+        """Mutates state"""
+        for _, cards in self.cards.items():
             random.shuffle(cards)
 
-    def __draw(self, t):
-        if self.cards[t]:
-            return self.cards[t].pop(0)
+    def __draw_and_replace(self, src_card_list, dest_card_list):
+        try:
+            new_card = src_card_list.pop(0)
+            dest_card_list.append(new_card)
+        except IndexError:
+            print('No more cards in deck')
+            return
 
     def __draw_initial(self):
         board = { t: [] for t in self.__TIERS }
         for t in self.__TIERS:
             for _ in range(self.__TIER_SIZE):
-                board[t].append(self.__draw(t))
+                self.__draw_and_replace(self.cards[t], board[t])
         return board
+
+    def __draw_nobles(self):
+        nobles = self.__load_nobles()
+        random.shuffle(nobles)
+        return nobles[:self.__NUM_NOBLES]
 
     def __initialize_gems(self, num_players):
         n = 7
@@ -47,25 +66,29 @@ class GameState():
         return [n for _ in range(len(self.__GEMS))]
 
     def __initialize_players(self, num_players):
-        return { i: { 'gems': [0, 0, 0, 0, 0], 'cards': [], 'reserved': [], 'gold': 0 }
+        return { i: { 'gems': [0, 0, 0, 0, 0], 'cards': [], 'nobles': [],
+                      'reserved': [], 'gold': 0 }
                  for i in range(num_players) }
 
     def __init__(self, num_players=2):
         """
         self.cards: { [tier]: [[w_cost, u_cost, g_cost, r_cost, b_cost, value_color, points]] }
         self.board: { [tier]: [[w_cost, u_cost, g_cost, r_cost, b_cost, value_color, points]] }
+        self.nobles: [[w_cost, u_cost, g_cost, r_cost, b_cost, points]]
         self.gems: [w_count, u_count, g_count, r_count, b_count]
         self.gold: 5
         self.players: { [player]: {
             gems: [w_count, u_count, g_count, r_count, b_count],
             cards: [[w_cost, u_cost, g_cost, r_cost, b_cost, value_color, points]],
+            nobles: [[w_cost, u_cost, g_cost, r_cost, b_cost, points]],
             reserved: [[w_cost, u_cost, g_cost, r_cost, b_cost, value_color, points]],
             gold: 0
         }}
         """
         self.cards = self.__load_cards()
-        self.__shuffle()
+        self.__shuffle_cards()
         self.board = self.__draw_initial()
+        self.nobles = self.__draw_nobles()
         self.gems = self.__initialize_gems(num_players)
         self.gold = self.__GOLD_LIMIT
         self.players = self.__initialize_players(num_players)
@@ -76,7 +99,8 @@ class GameState():
         }
 
     def get_points(self, player):
-        return sum([x[-1] for x in self.players[player]['cards']])
+        return (sum([x[-1] for x in self.players[player]['cards']])
+                + sum([x[-1] for x in self.players[player]['nobles']]))
 
     def get_total_gems(self, player):
         return [x + y for x, y in zip(self.players[player]['gems'], self.get_card_gems(player))]
@@ -125,7 +149,7 @@ class GameState():
     def __check_card_exists(self, card_list, index):
         try:
             card_list[index]
-        except Indexerror:
+        except IndexError:
             raise IllegalMove('Target card doesn\'t exist')
 
     def __check_player_can_buy(self, player, target_costs):
@@ -161,7 +185,7 @@ class GameState():
         # Take and draw
         card = card_list.pop(index)
         self.players[player]['reserved'].append(card)
-        card_list.append(self.__draw(tier))
+        self.__draw_and_replace(self.cards[tier], card_list)
         # Take gold
         self.players[player]['gold'] += 1
 
@@ -191,6 +215,16 @@ class GameState():
         def take(card_list, index):
             card = card_list.pop(index)
             self.players[player]['cards'].append(card)
+        def noble_visit():
+            player_card_gems = self.get_card_gems(player)
+            to_remove_indices = []
+            for i, noble in enumerate(self.nobles):
+                # If noble gem cost - player card gem <= 0 for each gem
+                if sum([max(x - y, 0) for x, y in zip(noble[:5], player_card_gems)]) == 0:
+                    to_remove_indices.append(i)
+                    self.players[player]['nobles'].append(noble)
+            self.nobles = [noble for i, noble in enumerate(self.nobles)
+                           if i not in to_remove_indices]
 
         self.__check_buy_valid(data)
         tier, index, from_reserve = data
@@ -204,7 +238,8 @@ class GameState():
             card = self.can_buy(card_list, index, player)
             pay(card)
             take(card_list, index)
-            card_list.append(self.__draw(tier)) # Replace card
+            self.__draw_and_replace(self.cards[tier], card_list)
+        noble_visit()
 
     def move(self, player, action, data):
         if action == 't3':
@@ -233,6 +268,8 @@ class GameState():
             print('    CARD: {}'.format(card))
         for card in pstate['reserved']:
             print('    RESERVED: {}'.format(card))
+        for card in pstate['nobles']:
+            print('    NOBLE: {}'.format(card))
 
     def print_state(self):
         print('=====NEW STATE=====')
@@ -240,6 +277,9 @@ class GameState():
             print('=TIER {}='.format(tier))
             for card in bstate:
                 print(card)
+        print('=NOBLES=')
+        for noble in self.nobles:
+            print(noble)
         print('=GEMS=')
         print(self.gems)
         for i, _ in self.players.items():

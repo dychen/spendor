@@ -2,6 +2,9 @@
 Training an AI over the board game Splendor (original, not the expansions)
 https://en.wikipedia.org/wiki/Splendor_(game)
 
+Using card data from here:
+https://drive.google.com/file/d/0B4yyYVH10iE5VlBFME9QelBVUnc/edit
+
 # Playing
 ```
 $ python game.py
@@ -63,6 +66,11 @@ $ python game.py
 [Card 2]
 [Card 3]
 [Card 4]
+=NOBLES= # Nobles
+[Noble 1]
+[Noble 2]
+[Noble 3]
+[Noble 4]
 =GEMS=
 [Number of each gem on the board in the following order: White, Blue, Green, Red, Black]
 # ^ This gem order is used in all places that use a gem array (e.g. card cost)
@@ -75,6 +83,8 @@ $ python game.py
     ...
     RESERVED: [Card the player has reserved]
     ...
+    NOBLE: [Noble that has visited the player]
+    ...
 ========END========
 ```
 
@@ -82,7 +92,12 @@ $ python game.py
 Read card state (7-element array) as follows:
 ```
 [White cost, Blue cost, Green cost, Red cost, Black cost, Gem bonus color (always +1), Points/prestige]
-```
 
-# Rules questions (unresolved)?
+# Nobles
+Read noble state (6-element array) as follows:
+[White cost, Blue cost, Green cost, Red cost, Black cost, Points/prestige]
+
+# TODOs/Rules questions (unresolved)?
 * Can you reserve a card if the gold stack is depleted? Currently, it throws an error
+* Add gold to each player's gem limit and handle the case when the player already has 10 gems and reserves a card
+* Implement blind reservations
